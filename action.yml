@@ -4,30 +4,33 @@ description: Setup Rust with caching
 
 inputs:
   # See https://rust-lang.github.io/rustup/concepts/components.html
-  clippy:
-    default: false
+  components:
     required: false
-    type: boolean
-  fmt:
-    default: false
+    type: string
+    description: space separated Rust components, e.g. `clippy rustfmt rust-docs`
+
+  tools:
     required: false
-    type: boolean
-  docs:
-    default: false
-    required: false
-    type: boolean
+    type: string
+    description: comma separated Cargo tools
+
   restore-cache:
     default: true
     required: false
     type: boolean
+    description: whether to restore cache
+
   save-cache:
     default: false
     required: false
     type: boolean
-  shared-key:
-    default: 'warm'
+    description: whether to save cache, e.g. `github.ref_name == 'main'`
+
+  cache-key:
+    default: 'main'
     required: false
     type: string
+    description: cache key prefix
 
 runs:
   using: composite
@@ -35,45 +38,26 @@ runs:
     - name: Print Inputs
       shell: bash
       run: |
-        echo 'clippy: ${{ inputs.clippy }}'
-        echo 'fmt: ${{ inputs.fmt }}'
-        echo 'docs: ${{ inputs.docs }}'
+        echo 'components: ${{ inputs.components }}'
+        echo 'tools: ${{ inputs.tools }}'
         echo 'restore-cache: ${{ inputs.restore-cache }}'
         echo 'save-cache: ${{ inputs.save-cache }}'
-        echo 'shared-key: ${{ inputs.shared-key }}'
+        echo 'cache-key: ${{ inputs.cache-key }}'
 
-    - name: Change to minimal profile on MacOS
+    - name: Change to minimal profile
       shell: bash
-      if: runner.os == 'macOS'
       run: |
-        sed -i '' -e 's/profile = "default"/profile = "minimal"/g' rust-toolchain.toml
+        sed -i ${{ (runner.os == 'macOS' && '""') || '' }} -e 's/profile = "default"/profile = "minimal"/g' rust-toolchain.toml
         cat rust-toolchain.toml
 
-    - name: Change to minimal profile on non-MacOS
-      shell: bash
-      if: runner.os != 'macOS'
-      run: |
-        sed -i -e 's/profile = "default"/profile = "minimal"/g' rust-toolchain.toml
-        cat rust-toolchain.toml
-
-    - name: Set minimal profile
+    - name: Set Minimal Profile
       shell: bash
       run: rustup set profile minimal
 
-    - name: Add Clippy
+    - name: Add Components
       shell: bash
-      if: ${{ inputs.clippy == 'true' }}
-      run: rustup component add clippy
-
-    - name: Add Rustfmt
-      shell: bash
-      if: ${{ inputs.fmt == 'true' }}
-      run: rustup component add rustfmt
-
-    - name: Add docs
-      shell: bash
-      if: ${{ inputs.docs == 'true' }}
-      run: rustup component add rust-docs
+      if: ${{ inputs.components }}
+      run: rustup component add ${{ inputs.components }}
 
     - name: Install
       shell: bash
@@ -85,5 +69,11 @@ runs:
       uses: Swatinem/rust-cache@v2
       if: ${{ inputs.restore-cache == 'true' }}
       with:
-        shared-key: ${{ inputs.shared-key }}
+        shared-key: ${{ inputs.cache-key }}
         save-if: ${{ inputs.save-cache == 'true' }}
+
+    - name: Install Tools
+      uses: taiki-e/install-action@v2
+      if: ${{ inputs.tools }}
+      with:
+        tool: ${{ inputs.tools }}
